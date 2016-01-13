@@ -40,6 +40,7 @@ static int compute_extensions_start(asn1p_expr_t *expr);
 static int expr_break_recursion(arg_t *arg, asn1p_expr_t *expr);
 static int expr_as_xmlvaluelist(arg_t *arg, asn1p_expr_t *expr);
 static int expr_elements_count(arg_t *arg, asn1p_expr_t *expr);
+static int expr_elements_has_extension(arg_t *arg, asn1p_expr_t *expr);
 static int emit_single_member_PER_constraint(arg_t *arg, asn1cnst_range_t *range, int juscountvalues, char *type);
 static int emit_member_PER_constraints(arg_t *arg, asn1p_expr_t *expr, const char *pfx);
 static int emit_member_table(arg_t *arg, asn1p_expr_t *expr);
@@ -428,6 +429,12 @@ asn1c_lang_C_type_SEQUENCE_def(arg_t *arg) {
 		elements = 0;
 		roms_count = 0;
 		aoms_count = 0;
+
+		if (expr_elements_has_extension(arg, expr))
+		{
+			ext_start = 0;
+			ext_stop = 0;
+		}
 	}
 
 	/*
@@ -1786,6 +1793,28 @@ expr_elements_count(arg_t *arg, asn1p_expr_t *expr) {
 	}
 
 	return elements;
+}
+
+static int
+expr_elements_has_extension(arg_t *arg, asn1p_expr_t *expr) {
+	asn1p_expr_t *topmost_parent;
+	asn1p_expr_t *v;
+	int elements = 0;
+
+	topmost_parent = asn1f_find_terminal_type_ex(arg->asn, expr);
+	if(!topmost_parent) return 0;
+
+	if(!(topmost_parent->expr_type & ASN_CONSTR_MASK)
+	&& !topmost_parent->expr_type == ASN_BASIC_INTEGER
+	&& !topmost_parent->expr_type == ASN_BASIC_ENUMERATED)
+		return 0;
+
+	TQ_FOR(v, &(topmost_parent->members), next) {
+		if(v->expr_type == A1TC_EXTENSIBLE)
+			elements++;
+	}
+
+	return (elements != 0);
 }
 
 static asn1p_expr_type_e
